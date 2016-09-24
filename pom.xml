@@ -137,8 +137,4 @@
 			<version>20140107</version>
 		</dependency>
 	</dependencies>
-
-
-
-	<description>library for asynchrnous communication  staack for network layer with HTTP and JSON-RPC protocol implementaion</description>
 </project>

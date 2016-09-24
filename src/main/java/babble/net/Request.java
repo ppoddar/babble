@@ -2,7 +2,9 @@ package babble.net;
 
 import java.io.IOException;
 import java.io.Serializable;
-import java.nio.channels.SocketChannel;
+import java.nio.channels.ByteChannel;
+
+import babble.net.exception.ProtocolException;
 
 
 /**
@@ -27,58 +29,44 @@ import java.nio.channels.SocketChannel;
  *
  */
 @SuppressWarnings("serial")
-public abstract class Request  implements Serializable {
-    private SocketChannel    _channel;
-    private ResponseCallback _callback;
+public abstract class Request extends NetworkBuffer implements Serializable {
     
+    public Request()  {
+   }
+
     /**
      * Create a request bound to the given network channel.
      * 
      * @param channel must not be null. May be connected. If not connected,
      * then the target host and port of the request target is undetermined.
      */
-    public Request(SocketChannel channel)  {
-        _channel = channel;
+    public Request(ByteChannel channel)  {
+        super();
+        setChannel(channel);
    }
 
     public boolean isOneWay() {
         return false;
     }
 
-    /**
-     * Gets the channel on which this request had been received.
-     * Can be null. 
-     * The response ill be sent on the same channel.
-     */
-    public final SocketChannel getChannel() {
-        return _channel;
-    }
-    
-    /**
-     * Sets the callback function that would be invoked when the asynchronous
-     * response becomes available.
-     * 
-     * @param cb a callback function
-     */
-    void setResponseCallback(ResponseCallback cb) {
-        _callback = cb;
-    }
-    
-    /**
-     * Gets the callback function that would be invoked when the asynchronous
-     * response becomes available.
-     * 
-     * @return  a callback function
-     */
-    ResponseCallback getResponseCallback() {
-        return _callback;
-    }
+     
     
     /**
      * Send this request via the given network channel.
      * 
      * @throws IOException if  can not be sent over the channel 
      */
-    protected abstract void send(SocketChannel channel) throws IOException;
+    protected abstract void send(ByteChannel channel) throws IOException;
     
+    /**
+     * Receive this request from a given channel.
+     * 
+     * @param channel
+     * @return true if content is useful (not 0-by data, for example)
+     * @throws ProtocolException if content is ill-formed
+     * @throws IOException if content can not be read from channel
+     * 
+     */
+    protected abstract void receive(ByteChannel channel) 
+            throws ProtocolException, IOException;
 }

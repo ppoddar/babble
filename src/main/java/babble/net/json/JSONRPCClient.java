@@ -4,6 +4,8 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.json.JSONObject;
 
@@ -21,7 +23,7 @@ import babble.util.SimpleURI;
  * @author pinaki poddar
  *
  */
-public class JSONRPCClient extends NioClient<JSONRequest> implements ResponseCallback {
+public class JSONRPCClient extends NioClient<JSONRequest,JSONResponse> implements ResponseCallback {
     
     public static void main(String[] args) throws Exception {
         if (args.length != 1) {
@@ -45,15 +47,34 @@ public class JSONRPCClient extends NioClient<JSONRequest> implements ResponseCal
     
 
     public JSONRPCClient(String host, int port) throws IOException {
-        super(host, port);
+        super(host, port, false);
        
     }
     
+    private List<byte[]> _accumulatedResponse = new ArrayList<byte[]>();
     @Override
-    public void onResponse(byte[] bytes) {
-        JSONObject response = new JSONObject(new String(bytes));
-        getLogger().info("<-");
-        JSONResponse.printOutput(System.out, response);
+    public void onResponse(byte[] bytes, boolean eos) {
+        if (_accumulatedResponse.isEmpty()) {
+            getLogger().info("--- server response --- ");
+        
+        }
+        if (eos) {
+            int nTotalBytes = 0;
+            for (byte[] chunk : _accumulatedResponse) {
+                nTotalBytes += chunk.length;
+            }
+            byte[] allBytes = new byte[nTotalBytes];
+            int pos = 0;
+            for (byte[] chunk : _accumulatedResponse) {
+                System.arraycopy(chunk, 0, allBytes, pos, chunk.length);
+                pos += chunk.length;
+            }
+            
+            JSONObject response = new JSONObject(new String(allBytes));
+            JSONResponse.printOutput(System.out, response);
+        } else {
+            _accumulatedResponse.add(bytes);
+        }
 
     }
 

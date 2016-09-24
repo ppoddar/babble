@@ -4,8 +4,7 @@ package babble.net;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.SocketAddress;
-import java.nio.ByteBuffer;
+import java.nio.channels.ByteChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
@@ -65,58 +64,69 @@ import babble.util.ChannelInfo;
  * @author pinaki poddar
  *
  */
-public abstract class NioServer<R extends Request, P extends Response<R>> 
+public abstract class NioServer<R extends Request,P extends Response> 
     implements Runnable {
-    
+    private String _name; 
     private String _hostname;
     private int _port;
     private Selector _selector;
-    private Router<R,P> _router;
+    private final Protocol<R,P> _protocol;
+    private final Router<R,P> _router;
     private ExecutionContext _ctx;
+    private final Object _selectorBug = new Object();
     
     private Logger _logger;
 
     /**
      * Creates a server to listen for incoming connection requests on 
-     * the given port.
+     * the given port. The given protocol determines the type of request
+     * and response.
      * 
      * @param serverName a name to describe this server.
      * @param port a port to listen for incoming request
+     * @param protocol protocol used by this server
      * 
      * @throws IOException
      */
-    public NioServer(String serverName, int port) {
-        final String name = serverName == null ? "" : serverName;;
+    protected NioServer(String serverName, int port, Protocol<R, P> protocol) {
+        final String name = serverName;
+        System.setProperty("java.net.preferIPv4Stack", ""+true);
+        _name = serverName;
         _logger = LoggerFactory.getLogger(name);
         _port   = port;
         _hostname = determineHostname();
         _ctx = new ExecutionContext() {
             @Override
             public String getName() {
-                return name;
+                return _name;
             }
         };
+        _protocol = protocol;
+        _router = _protocol.newRouter(this);
+    }
+    
+    public final Protocol<R,P> geProtocol() {
+        return _protocol;
     }
     
     /**
-     * Gets a logical name of this server which is same as the name of
-     * its execution context.
+     * Gets a logical name of this server.
      */
     public String getName() {
-        return _ctx.getName();
+        return _name;
     }
     
     /**
      * Gets the host name on which this server is running. 
      */
-    public String getHostName(){
+    String getHostName(){
         return _hostname;
     }
     
     /**
      * Gets the port on which this server listens for incoming request.
      */
-    public int getPort() {
+    int getPort() {
         return _port;
     }
     
@@ -140,14 +150,6 @@ public abstract class NioServer<R extends Request, P extends Response<R>>
     }
     
     
-    /**
-     * Sets the router to process incoming requests.
-     * A router must be set prior to {@link #start() start} a server.
-     * The router determines what type of request a server can handle. 
-     */
-    protected void setRouter(Router<R,P> router) {
-        _router = router;
-    }
     
     /**
      * Adds given route to this server. A route is invoked it  
@@ -209,29 +211,39 @@ public abstract class NioServer<R extends Request, P extends Response<R>>
     public void run() {
         while (!Thread.interrupted()) {
             try {
-                _selector.select();
-                Iterator<SelectionKey> selectedKeys = _selector.selectedKeys().iterator();
-                while (selectedKeys.hasNext()) {
-                    SelectionKey key = selectedKeys.next();
-                    selectedKeys.remove();
-
-                    if (!key.isValid()) {
-                        continue;
-                    }
-                    if (key.isAcceptable()) {
-                        acceptConnectionRequest(key);
-                    } else if (key.isReadable()) {
-                        processRequest(key);
-                   } else if (key.isWritable()) {
-                       sendResponse(key);
-                    }
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
-            } 
+                step();
+                synchronized (_selectorBug) {}
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
         }
+    }        
+        
+    private void step() throws Exception {    
+        
+        SelectionKey key = null;
+        
+        _selector.select();
+        Iterator<SelectionKey> selectedKeys = _selector.selectedKeys().iterator();
+        while (selectedKeys.hasNext()) {
+            key = selectedKeys.next();
+            selectedKeys.remove();
+
+            if (!key.isValid()) {
+                continue;
+            }
+            if (key.isAcceptable()) {
+                acceptConnectionRequest(key);
+            } else if (key.isReadable()) {
+                readRequestFromChannelAndProcess(key);
+            } else if (key.isWritable()) {
+               writeResponseToChannel(key);
+            }
+         }
+        
     }
-    
+
+
     /**
      * Queues the given response to be sent to client.
      * Typically a request-processing thread will call this method when
@@ -247,19 +259,8 @@ public abstract class NioServer<R extends Request, P extends Response<R>>
      * @param response the response to be sent to remote client.
      * Can not be null. If null, then the this method becomes a no-op.
      */
-    public void processResponse(Response<R> response) {
-        try {
-            if (response == null) {
-                _logger.warn("ignore sending null response");
-            } else {
-                response.getRequest().getChannel()
-                    .register(_selector, SelectionKey.OP_WRITE, response);
-                _selector.wakeup();
-            }
-        } catch (Exception ex) {
-            ex.printStackTrace();
-        }
-    }
+    
+
     
     /**
      * Process request coming over a channel. 
@@ -277,12 +278,49 @@ public abstract class NioServer<R extends Request, P extends Response<R>>
      * can not be interpreted.
      * Secondly, the requested operation may fail.
      */
-    void processRequest(SelectionKey key) throws Exception {
-            byte[] requestData = readRequestFromChannel(key);
-            if (requestData != null && requestData.length > 0) {
-                _router.processRequest((SocketChannel) key.channel(), requestData);
-            }
+    void readRequestFromChannelAndProcess(SelectionKey key) throws Exception {
+        Object attachement = key.attachment();
+        if (RequestReceiver.class.isInstance(attachement)) {
+            // someone is already handling request from this client
+        } else { // new request
+            _logger.debug("creating new request receiver for " + attachement);
+            RequestReceiver receiver = new RequestReceiver();
+            key.attach(receiver);
+            receiver._channel = (ByteChannel)key.channel();
+            receiver._request = _protocol.newRequest();
+            
+            Thread requestThread = new Thread(receiver);
+            ChannelInfo info = new ChannelInfo(key.channel());
+            requestThread.setName("request-" + info);
+            requestThread.setDaemon(true);
+            requestThread.start();
+        }
     }
+    
+    
+    
+    public void processResponse(P response) {
+        SocketChannel channel = (SocketChannel)response
+                .getRequest().getChannel();
+        
+        _logger.debug("registering key to process response...");
+        synchronized (_selectorBug) {
+            try {
+                _selector.wakeup();
+                channel.register(_selector, SelectionKey.OP_WRITE, response);
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+        }
+    }
+
+    /** Returns the protocol.
+     * 
+     */
+   public Protocol<R,P> getProtocol() {
+       return _protocol;
+   }
+
     
     /**
      * Sends response to the channel represented by the given key.
@@ -290,9 +328,8 @@ public abstract class NioServer<R extends Request, P extends Response<R>>
      * 
      * @param key
      */
-    void sendResponse(SelectionKey key) {
-        @SuppressWarnings("unchecked")
-        Response<R> response = (Response<R>) key.attachment();
+    void writeResponseToChannel(SelectionKey key) {
+        Response response = (Response) key.attachment();
         if (response == null) {
             _logger.warn("ignore sending null response");
         }
@@ -305,6 +342,8 @@ public abstract class NioServer<R extends Request, P extends Response<R>>
             }
         } catch (Exception ex) {
             closeChannel(key, true, ex);
+        } finally {
+            key.cancel();
         }
     }
 
@@ -340,14 +379,10 @@ public abstract class NioServer<R extends Request, P extends Response<R>>
      */
     private void acceptConnectionRequest(SelectionKey key) throws IOException {
         ServerSocketChannel serverSocketChannel = (ServerSocketChannel) key.channel();
-
-        SocketChannel socketChannel = serverSocketChannel.accept();
-        socketChannel.configureBlocking(false);
-        ClientInfo client = new ClientInfo(socketChannel.getRemoteAddress());
-        _logger.info("accepted connection " + client);
-        
-
-        socketChannel.register(_selector, SelectionKey.OP_READ, client);
+        SocketChannel channel = serverSocketChannel.accept();
+        channel.configureBlocking(false);
+        _logger.info("accepted connection from " + new ChannelInfo(channel));
+        channel.register(_selector, SelectionKey.OP_READ);
     }
 
     /**
@@ -371,40 +406,7 @@ public abstract class NioServer<R extends Request, P extends Response<R>>
         return socketSelector;
     }
     
-    private final  ByteBuffer _readBuffer = ByteBuffer.allocate(8*1024);
 
-    /**
-     * Reads request as raw bytes from the channel of the given key 
-     * @param key selection key corresponding to channel to read data from
-     * @return an array of byte read. null if exception
-     */
-    protected byte[] readRequestFromChannel(SelectionKey key) {
-        _readBuffer.clear();
-        // IMPORTANT: must use channel than the underlying socket stream
-        SocketChannel channel = (SocketChannel)key.channel();
-        while (_readBuffer.remaining() > 0) {
-            try {
-                int n = channel.read(_readBuffer);
-                if (n == 0) break; // no more request data to read
-                if (n < 0) {
-                    closeChannel(key, true, " connection has been closed by remote client");
-                    break;
-                }
-            } catch (IOException ex) {
-                closeChannel(key, true, ex);
-                break;
-            }
-        }
-        int L = _readBuffer.position();
-        if (L > 0)
-        _logger.debug("read " + L + " bytes from " + key.attachment());
-        byte[] bytes = new byte[L];
-        _readBuffer.position(0);
-        _readBuffer.get(bytes, 0, L);
-        return bytes;
-    }
-    
-    
     
     String determineHostname() {
         String DEFAULT_ROUTE = "127.0.0.1";
@@ -433,7 +435,7 @@ public abstract class NioServer<R extends Request, P extends Response<R>>
      * @return a base URL for this network server. 
      */
     public String getURL() {
-        return _router.getProtocol() + "://" 
+        return getProtocol().getName() + "://" 
              + getHostName() + ":" + getPort();
     }
     
@@ -468,26 +470,31 @@ public abstract class NioServer<R extends Request, P extends Response<R>>
         return _logger;
     }
     
+    
     /**
-     * A client info captures network channel information about a remote
-     * client after it has connected to this server.
+     * A request receiver reads request from a network channel. The remote
+     * client may take long time to write the request bytes n the channel
+     * and hence it may take a long time for a request to be read from the
+     * channel.
+     * Hence, a thread is dedicated to read from the channel.
      * 
+     * @author pinaki poddar
      *
      */
-    class ClientInfo {
-        String _host = "?";
-        int _port = 0;
+    class RequestReceiver implements Runnable {
+        private R _request;
+        private ByteChannel _channel;
         
-        ClientInfo(SocketAddress addr) {
-            if (InetSocketAddress.class.isInstance(addr)) {
-                _host = ((InetSocketAddress)addr).getHostName();
-                _port = ((InetSocketAddress)addr).getPort();
+        @Override
+        public void run() {
+            try {
+                // this call will block until remote client completes a request
+                _request.receive(_channel);
+                _router.processRequest(_request);
+            } catch (Exception ex) {
+                P response = _protocol.newErrorResponse(_request, ex);
+                processResponse(response);
             }
         }
-        
-        public String toString() {
-            return "client@" + _host + ':' + _port;
-        }
     }
-    
 }

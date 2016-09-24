@@ -3,169 +3,95 @@ package babble.net;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Serializable;
-import java.nio.ByteBuffer;
+import java.nio.channels.ByteChannel;
 import java.nio.channels.SocketChannel;
-import java.nio.file.Files;
 import java.nio.file.Path;
 
 /**
  * A response at network level is simply an array of bytes.
- * Given a writable channel, the bytes can be written to the channel.
  * <br>
- * The user of this facility can write multi-byte data of higher forms 
- * such as an integer or long value. The facility will account for 
- * network byte order (e.g BIG or LITTLE endian).
- * <br> 
- * This facility can also {@link #stream(Path) pipe} the data from
+ * This facility sends the bytes over a network channel 
+ * (and buffers them for efficiency). 
+ * This facility is not aware of ordering of the bytes or their semantics,
+ * a protocol-specific response writes the bytes in order of their meaning
+ * as per a particular protocol specification.
+ * 
+ * <p>
+ * This operation buffers the bytes and flushes the internal buffer when 
+ * it fills up. The flush may fail if this response is not associated with
+ * a writable channel. 
+ * 
+ * <p>
+ * A response is <em>implicitly</em> associated at construction 
+ * with the same network channel of the request that originated it. 
+ * Hence, by default, the response is written to the same network channel
+ * of an incoming request. However, a protocol may require that response is
+ * written to a network channel different than that of the request. 
+ * In such case, the protocol must {@link #setChannel(SocketChannel) set
+ * a channel} before write operations.   
+ *  
+ * <p>
+ * <b>Writing different data types</b>: 
+ * <ul>
+ * <li><b>Multi-Byte Data</b>:
+ * multi-byte data such as an integer or long value can be wriiten. 
+ * The facility accounts for network byte order (e.g BIG or LITTLE endian).
+ * <li><b>String</b>:
+ * Strings are written as array of bytes using the encoding scheme set by
+ * the user. The default encoding scheme the default encoding scheme
+ * of the Java Virtual Machine. 
+ * <li><b>Stream</b>: data form a {@link Response#writeStream(Path) resource 
+ * path} or {@link #writeStream(InputStream, boolean) other stream} can be
+ * streamed.
+ * 
+ * </ul>
+ * 
+ * This facility can also {@link #writeStream(Path) pipe} the data from
  * another resource.  
  * 
  * @author pinaki poddar
  *
  */
 @SuppressWarnings("serial")
-public abstract class Response<R extends Request>  implements Serializable {
-    final R _request;
-    final ByteBuffer _buffer;
-    private boolean _error;
-    
-    public static final int MAX_BUFFER_SIZE = 8*1024;
+public abstract class Response extends NetworkBuffer implements Serializable {
+    private final Request _request;
     
     /**
      * Creates an response for a given request.
-     * The request must be bound to a network channel. The response will 
-     * be sent via the same channel.
      * 
-     * @param request the request for which this request will be created 
+     * @param request the request for which this request will be created.
+     * Must not be null. 
      * 
-     * @throws IllegalArgumentException if channel is null
+     * @throws IllegalArgumentException if request is null
      */
-    public Response(R request) {
-        if (request == null) 
-            throw new IllegalArgumentException("Can not create response for null request");
-        _request = request;
-        _buffer = ByteBuffer.allocate(MAX_BUFFER_SIZE);
+    public Response(Request r) {
+        if (r == null) throw new IllegalArgumentException("Can not create "
+                + "response for null request");
+        _request = r;
     }
     
-    public R getRequest() {
+    public Request getRequest() {
         return _request;
     }
     
-
     /**
-     * Writes this response on to the given network channel.
+     * Sends the data over a channel. The protocol will set
+     * {@link #setChannel(SocketChannel) channel}, invoke one or more
+     * write operations and then call this method to complete sending the response
+     * over channel.
      * 
-     * @throws IllegalStateException if channel is closed or disconnected
-     * 
+     * @param channel a communication channel.
+     * @throws IOException
      */
-    protected void send(SocketChannel channel) throws IOException {
-        //SocketChannel channel = _request.getChannel();
-        if (!channel.isOpen())
-            throw new IllegalStateException("Can not write to closed channel");
-        if (!channel.isConnected())
-            throw new IllegalStateException("Can not write to disconnected channel");
-        
-        _buffer.flip();
-        channel.write(_buffer);
-    }
-
-    /**
-     * Writes the given strings. The non-null strings are written as 
-     * array of bytes. No encoding is applied.
-     * 
-     * @param values an array of strings. If null, no action is taken.
-     * If an element is null, it is skipped. 
-     * @return the same response for chaining
-     * @throws IOException if given values can not be written
-     */
-    public Response<R> write(String... values) throws IOException {
-        if (values == null) return this;
-        for (int i = 0; i < values.length; i++) {
-            if (values[i] != null) {
-                _buffer.put(values[i].getBytes());
-            }
-        }
-        return this;
-    }
-
-    /**
-     * Writes the given long value
-     * @param value long number
-     * @return the same response for chaining
-     * @throws IOException if given value can not be written
-     */
-    public Response<R> write(long value) throws IOException {
-        _buffer.putLong(value);
-        return this;
-    }
+    protected abstract void send(ByteChannel channel) throws IOException;
     
     /**
-     * Writes the given integer value
-     * @param value integer number
-     * @return the same response for chaining
-     * @throws IOException if given value can not be written
+     * Receives data over a given channel.
+     * @param channel
+     * @param cb if not null, then invokes the callback function as new 
+     * data arrives or exception is raised
+     * @throws IOException
      */
-    public Response<R> write(int value) throws IOException {
-        _buffer.putInt(value);
-        return this;
-    }
-    
-    /**
-     * Writes the given array of bytes.
-     * @param bytes array of bytes. If null, no action taken.
-     * @return the same response for chaining
-     * @throws IOException if given value can not be written
-     */
-    public Response<R> writeBytes(byte[] bytes) throws IOException {
-        if (bytes != null) {
-            _buffer.put(bytes);
-        }
-        return this;
-    }
-    
-    /**
-     * Writes the content of given path.
-     * @param path to an input stream. If null, no action is taken.
-     * @return the same response for chaining
-     * @throws IOException if given value can not be written
-     */
-    public Response<R> stream(Path path) throws IOException {
-        if (path == null) return this;
-        return stream(Files.newInputStream(path), true);
-    }
-
-    
-    /**
-     * Writes the content of given input stream.
-     * @param in an input stream. 
-     * @param close if true closes the input stream
-     * @return the same response for chaining
-     * @throws IOException if given value can not be written
-     */
-    Response<R> stream(InputStream in, boolean close) throws IOException {
-        if (in == null) return this;
-        int b = -1;
-        while ((b = in.read()) != -1) {
-            _buffer.put((byte)b);
-        }
-        if (close) {
-            in.close();
-        }
-        return this;
-    }
-    
-    /**
-     * Affirms if this response represent an error condition.
-     */
-    public boolean isError() {
-        return _error;
-    }
-    
-    /**
-     * Mark this response as an error response
-     */
-    public Response<R> markError() {
-         _error = true;
-         return this;
-    }
+    protected abstract void receive(ByteChannel channel, ResponseCallback cb);
 
 }

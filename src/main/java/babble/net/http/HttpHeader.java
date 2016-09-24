@@ -5,20 +5,22 @@ class HttpHeader {
     String value;
     
     public HttpHeader(String name, String value) {
-        this.name = name.trim();
-        this.value = value.trim();
+        this.name  = name;
+        this.value = value;
         
     }
     
     public HttpHeader(String line) {
+        if (line == null) return;
         int idx = line.indexOf(':');
+        if (idx == -1) return;
         name = line.substring(0,idx).trim();
         value = line.substring(idx+1).trim();
     }
     
     
     public String getName() {
-        return name;
+        return name == null ? "" : name;
     }
 
     public String getValue() {
@@ -26,7 +28,7 @@ class HttpHeader {
     }
     
     public String toString() {
-        return name + ':' + value;
+        return getName() + ':' + getValue();
     }
 
 

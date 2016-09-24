@@ -4,12 +4,16 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
-import java.nio.ByteBuffer;
+import java.nio.channels.ByteChannel;
+import java.nio.channels.Channel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
+//import java.nio.channels.SocketChannel;
 import java.nio.channels.spi.SelectorProvider;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
@@ -17,47 +21,90 @@ import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import babble.net.exception.ProtocolException;
 import babble.util.ChannelInfo;
-import babble.util.Timeout;
 
 
 /**
- * A client to a server to receive response asynchronously. 
+ * A client to a server. The client receives server response asynchronously. 
+ * <br>
+ * The caller {@link #sendRequest(Request, ResponseCallback) 
+ * sends} a request to server supplying a {@link ResponseCallback callback}. 
+ * The callback is {@link ResponseCallback#onResponse(byte[]) invoked} 
+ * whenever server completes the request and sends a response.
+ * <br>
+ * A <em>synchronous</em> client waits on a network channel until server 
+ * responds. Hence, during that waiting period, the network channel is
+ * <em>blocked>/em>, no other service can use it.
+ * <br>
+ * An <em>asynchronous</em> client, such as this one, does not block the
+ * network channel. Instead, the client immediately returns (with a void)
+ * when user sends a {@link #sendRequest(Request, ResponseCallback) sends}
+ * a request to server.
  * 
- * The caller can {@link #sendRequest(Request, ResponseCallback) 
- * send} a request to server supplying a callback. 
- * The callback will be invoked when server completes the
- * request and sends an asynchronous response.
  * <br>
- * A client that receives asynchronous response must wait till server responds.
- * However, a {@link #sendRequest(Request, ResponseCallback) request to server}
- * returns to caller immediately with a void.  
- * This aspect is different than synchronous client that waits for server
- * response before returning to the caller.   
+ * A client runs a <em>i/o thread</em>  that sends requests and receives 
+ * response from server.
+ * This 'main' thread is different than the thread on which user has called
+ * this client. The <em>i/o thread</em> runs continually until it is
+ * interrupted externally by a user.
+ * 
  * <br>
- * Hence a client continues running on a 'main' thread to receive response
- * from server over a network channel. Once a response is received, the
- * client invokes the callback function registered
- * when the request was sent with the asynchronous response received. 
+ * The ' 
  * 
  * @author pinaki poddar
  *
  * @param <R>
  */
-public abstract class NioClient<R extends Request> implements Runnable {
+public abstract class NioClient<R extends Request, P extends Response> implements Runnable {
     private InetAddress _hostAddress;
     private int _port;
 
     private Selector _selector;
-    private Object _selectorBug = new Object();
-    private SocketChannel _socketChannel;
-    private ByteBuffer _readBuffer = ByteBuffer.allocate(8 * 1024);;
+    private Protocol<R,P> _protocol;
+    private final Object _selectorBug = new Object();
+    private Channel _channel;
 
     private final BlockingDeque<Boolean> _connected = 
             new LinkedBlockingDeque<Boolean>();
 
     private Logger _logger;
+    
+    /**
+     * Create a client supplying the address and port of the server.
+     * The client will wait for 1 second to connect to server before giving up.
+     * 
+     * @param host remote host name to connect
+     * @param port port where host listens for request
+     * @param daemon if true runs the i/o thread as a daemon thread.
+     * If the client runs as a main program, then the i/o thread
+     * should be a non-daemon thread. Otherwise, the client will not
+     * be alive to receive an asynchronous response after the main
+     * program has exited.
+     * @throws IOException
+     */
+    public NioClient(String host, int port, boolean daemon) throws IOException {
+        this(InetAddress.getByName(host), port, daemon, 1, TimeUnit.SECONDS);
+    }
+
+    
+    /**
+     * Create a client supplying the address and port of the server.
+     * The client will run a daemon thread for network i/o and will wait
+     * for 1 second to connect to server before giving up.
+     * 
+     * @param host remote host name to connect
+     * @param port port where host listens for request
+     * @param daemon if true runs the i/o thread as a daemon thread.
+     * If the client runs as a main program, then the i/o thread
+     * should be a non-daemon thread. Otherwise, the client will not
+     * be alive to receive an asynchronous response after the main
+     * program has exited.
+     * @throws IOException
+     */
+    public NioClient(String host, int port) throws IOException {
+        this(InetAddress.getByName(host), port, true, 1, TimeUnit.SECONDS);
+    }
+
 
     /**
      * Create a client supplying the address and port of the server.
@@ -69,9 +116,20 @@ public abstract class NioClient<R extends Request> implements Runnable {
      * 
      * @param host remote host address to connect
      * @param port port where host listens for request
-     * @throws IOException
+     * @param daemon if true runs the i/o thread as a daemon thread.
+     * If the client runs as a main program, then the i/o thread
+     * should be a non-daemon thread. Otherwise, the client will not
+     * be alive to receive an asynchronous response after the main
+     * program has exited.
+     * @param timeout time limit before client gives up attempt to connect
+     * to server.
+     * @param unit unit of time to express the timeout value.
+     * 
+     * @throws IOException if server can not be contacted within given 
+     * timeout period.
      */
-    public NioClient(InetAddress host, int port) throws IOException {
+    public NioClient(InetAddress host, int port, boolean daemon,
+            int timeout, TimeUnit unit) throws IOException {
         System.setProperty("java.net.preferIPv4Stack", ""+true);
         String target = host.getHostName() + ':' + port;
         String name = "client->" + target;
@@ -79,15 +137,17 @@ public abstract class NioClient<R extends Request> implements Runnable {
         _hostAddress = host;
         _port = port;
 
-        Thread mainThread = new Thread(this, name);
-        mainThread.setDaemon(false); // otehrwise program will exit
-        mainThread.start();
+        if (!daemon) _logger.info(name + " is running non-daemon i/o thread");
+        Thread ioThread = new Thread(this, name);
+        ioThread.setDaemon(daemon); // otherwise program will exit
+        ioThread.start();
 
-        Timeout timeout = new Timeout(1, TimeUnit.SECONDS);
         _logger.info("waiting to connect in " + timeout);
         try {
-            if (_connected.pollFirst(timeout.value(), timeout.unit()) == null) {
-                throw new IOException("Can not connect to " + target + " in " + timeout);
+            if (_connected.pollFirst(timeout, unit) == null) {
+                ioThread.interrupt();
+                throw new IOException("Can not connect to " + target 
+                        + " in " + timeout + " " + unit);
             }
         } catch (InterruptedException ex) {
             ex.printStackTrace();
@@ -98,16 +158,6 @@ public abstract class NioClient<R extends Request> implements Runnable {
         return _logger;
     }
 
-    /**
-     * Create a client supplying the address and port of the server.
-     * 
-     * @param host remote host name to connect
-     * @param port port where host listens for request
-     * @throws IOException
-     */
-    public NioClient(String host, int port) throws IOException {
-        this(InetAddress.getByName(host), port);
-    }
 
 
     /**
@@ -122,17 +172,14 @@ public abstract class NioClient<R extends Request> implements Runnable {
     public void run() {
         _logger.debug("starting network event loop...");
         try {
-            _socketChannel = initiateConnection();
+            _channel = initiateConnection();
         } catch (Exception ex) {
             ex.printStackTrace();
         }
         while (!Thread.interrupted()) {
             try {
-                synchronized (_selectorBug) {
-                    step();
-                    _selectorBug.notifyAll();
-                    Thread.yield();
-                }
+                step();
+                synchronized (_selectorBug) { /*do nothing*/ }
             } catch (Exception ex) {
                 ex.printStackTrace();
             }
@@ -171,25 +218,25 @@ public abstract class NioClient<R extends Request> implements Runnable {
         }
     }
 
-    private SocketChannel initiateConnection() throws IOException {
+    private Channel initiateConnection() throws IOException {
         _logger.info("Contacting " + _hostAddress.getHostName()+':'+_port);
         
         _selector = SelectorProvider.provider().openSelector();
-        _socketChannel = SocketChannel.open();
-        _socketChannel.configureBlocking(false);
+        SocketChannel socketChannel = SocketChannel.open();
+        socketChannel.configureBlocking(false);
         InetSocketAddress addr = new InetSocketAddress(_hostAddress, _port);
         
-        boolean sucess = _socketChannel.connect(addr);
+        boolean sucess = socketChannel.connect(addr);
         if (sucess) {
             _logger.info("Connected to " + _hostAddress.getHostName()+':'+_port);
             _connected.offerFirst(sucess);
         }
 
-        _socketChannel.register(_selector, SelectionKey.OP_CONNECT);
+        socketChannel.register(_selector, SelectionKey.OP_CONNECT);
 
         _selector.wakeup();
 
-        return _socketChannel;
+        return socketChannel;
 
     }
 
@@ -211,7 +258,6 @@ public abstract class NioClient<R extends Request> implements Runnable {
                     _connected.offerFirst(true);
                 }
             } catch (Exception ex) {
-                    ex.printStackTrace();
             } finally {
                 _selector.wakeup();
             }
@@ -234,21 +280,24 @@ public abstract class NioClient<R extends Request> implements Runnable {
      *            
      * @throws IOException i/o errors
      */
-    public void sendRequest(R request, ResponseCallback cb) throws IOException {
-            
-        request.setResponseCallback(cb);
-        
-        
+    public void sendRequest(Request request, ResponseCallback cb) throws IOException {
+        _waitingRequests.put(request, cb);
+        // http://bugs.java.com/bugdatabase/view_bug.do?bug_id=6446653
         synchronized (_selectorBug) {
-            try {
-                _selectorBug.wait();
-                _socketChannel.register(_selector, SelectionKey.OP_WRITE, request);
                 _selector.wakeup();
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }  
+                ((SocketChannel)_channel)
+                        .register(_selector, SelectionKey.OP_WRITE, request);
+                
+            
         }
     }
+    
+    /**
+     * Request whose response is yet to arrive
+     */
+    Map<Request, ResponseCallback> _waitingRequests = 
+            new HashMap<Request, ResponseCallback>();
+    
     
     /**
      * writes a request on the network channel corresponding to the given key. 
@@ -258,8 +307,7 @@ public abstract class NioClient<R extends Request> implements Runnable {
      */
     void writeRequestToChannel(SelectionKey key) {
         try {
-            @SuppressWarnings("unchecked")
-            R request = (R) key.attachment();
+            Request request = (Request) key.attachment();
             _logger.debug("send  request to server " + request);
             request.send((SocketChannel)key.channel());
 
@@ -269,69 +317,49 @@ public abstract class NioClient<R extends Request> implements Runnable {
         }
     }
 
-    /**
-     * Gets the name of the remote server this client connects to. 
-     */
-    public String getHost() {
-        try {
-            return ((InetSocketAddress)getChannel()
-                    .getRemoteAddress())
-                    .getHostName();
-        } catch (IOException e) {
-        }
-        return "";
-    }
-    
 
 
     /**
      * Reads raw bytes from the channel corresponding to given key.
-     * The response object is attached with the given key. If the
-     * response is associated with a callback, then callback is invoked
-     * with raw bytes read from the network channel.
+     * The request object is attached with the given key. 
+     * Uses the protocol to create an empty response.
+     * Then protocol-specific response reads from the channel.
+     * If the request were associated with a callback, then response
+     * will invoke callback with the data it reads from network channel.
      */
     protected void readResponseFromChannel(SelectionKey key) {
-        SocketChannel channel = (SocketChannel) key.channel();
         @SuppressWarnings("unchecked")
-        R response = (R) key.attachment();
-        ResponseCallback cb = response.getResponseCallback();
+        R request = (R) key.attachment();
+        P response = getProtocol().newResponse(request);
+        ResponseCallback cb = getResponseCallback(request);
         try {
-            _readBuffer.clear();
-            int n = channel.read(_readBuffer);
-            _logger.debug("read " + n + " bytes response from " + channel.getRemoteAddress());
-            key.interestOps(SelectionKey.OP_CONNECT);
-            
-            if (n == -1) {
-                return;
-            }
-            byte[] bytes = new byte[n];
-            _readBuffer.position(0);
-            _readBuffer.get(bytes, 0, n);
-            if (cb != null) cb.onResponse(bytes);
-            
+            response.receive((ByteChannel)key.channel(), cb);
         } catch (Exception ex) {
             if (cb != null) cb.onError(ex);
+        } finally {
+            key.interestOps(SelectionKey.OP_CONNECT);
+            _waitingRequests.remove(request);
         }
+    }
+    /** Returns the protocol.
+     * 
+     */
+   public Protocol<R,P> getProtocol() {
+       return _protocol;
+   }
 
+    
+    private ResponseCallback getResponseCallback(Request request) {
+        return _waitingRequests.get(request);
     }
     
-    /**
-     * Gets the port of the remote server this client connects to. 
-     */
-    public int getPort() {
-        try {
-            return ((InetSocketAddress)getChannel().getRemoteAddress()).getPort();
-        } catch (IOException e) {
-        }
-        return 0;
-    }
-
+    
     /**
      * gets the channel that connects to the remote server.
      * 
      */
-    protected final SocketChannel getChannel() {
-        return _socketChannel;
+    protected final Channel getChannel() {
+        return _channel;
     }
 
 
@@ -339,7 +367,7 @@ public abstract class NioClient<R extends Request> implements Runnable {
      * affirms if connected to a remote server.
      */
     public boolean isConnected() {
-        return _socketChannel.isConnected();
+        return _channel.isOpen();
     }
     
     /**

@@ -9,7 +9,7 @@ import java.util.concurrent.CompletableFuture.AsynchronousCompletionTask;
  * @author pinaki poddar
  *
  */
-public interface Route<R extends Request, P extends Response<R>>  
+public interface Route<R extends Request, P extends Response>  
  extends AsynchronousCompletionTask {
     
     /**

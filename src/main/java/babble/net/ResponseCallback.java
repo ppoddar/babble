@@ -11,10 +11,14 @@ package babble.net;
  */
 public interface ResponseCallback {
     /**
-     * Invoked when normal response is available.
+     * Invoked when response is available. For streaming response, this
+     * can be invoked multiple times to deliver chunks of responses. The
+     * end-of-stream is signaled by the boolean parameter.
+     * 
      * @param bytes raw byte data of the response. Never null.
+     * @param eos true indicates end of stream
      */
-    void onResponse(byte[] bytes);
+    void onResponse(byte[] bytes, boolean eos);
     
     /**
      * Invoked when an error occurred to process a request. 

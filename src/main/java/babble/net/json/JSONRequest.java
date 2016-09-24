@@ -8,9 +8,9 @@ import static babble.net.json.JSONRPC.PROTOCOL_VERSION;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.ByteChannel;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
@@ -36,10 +36,13 @@ public class JSONRequest extends Request {
     private static Logger _logger = LoggerFactory.getLogger("JSONRPC-Request");
     
     
+    public JSONRequest() {
+    }
+    
     public JSONRequest(String s) throws ProtocolException {
-        super(null);
         parse(s);
     }
+
     
     public void putProperty(String key, Object value) {
         _json.put(key, value);
@@ -107,12 +110,16 @@ public class JSONRequest extends Request {
     }
 
     @Override
-    protected void send(SocketChannel channel) throws IOException {
+    protected void send(ByteChannel channel) throws IOException {
         channel.write(ByteBuffer.wrap(_json.toString().getBytes()));
     }
 
     public String getMethod() {
         return _json.getString(PROPERTY_METHOD);
+    }
+    
+    public JSONObject getBody() {
+        return _json;
     }
 
     /**
@@ -180,6 +187,11 @@ public class JSONRequest extends Request {
     
     public String toString() {
         return _json.toString();
+    }
+
+    @Override
+    protected void receive(ByteChannel channel) throws IOException {
+        throw new AbstractMethodError();
     }
 
 

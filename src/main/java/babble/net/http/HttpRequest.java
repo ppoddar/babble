@@ -6,10 +6,11 @@ import java.io.StringReader;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
+import java.nio.channels.ByteChannel;
+import java.nio.channels.Channel;
 import java.nio.channels.SocketChannel;
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -40,41 +41,44 @@ public class HttpRequest extends Request {
     String _version = "";
     URI _uri;
     Map<String,String> _params = new HashMap<String,String>();
-    List<HttpHeader> _headers = new ArrayList<HttpHeader>();
+    Map<String, HttpHeader> _headers = new HashMap<String, HttpHeader>();
     
     
     private static final Logger _logger = LoggerFactory.getLogger(HttpRequest.class);
+
+    HttpRequest() {
+        super();
+    }
     
     /**
-     * Creates a request that is not bound to any network channel.
-     * 
-     * @param data raw byte for request parameters
-     * 
-     * @throws ProtocolException
+     * Supply a HTTP method and a path.
      */
-    public HttpRequest(byte[] data) throws ProtocolException {
-        this(null, data);
+    public HttpRequest(String method, String path) throws ProtocolException {
+        super();
+        setMethod(method);
+        setPath(path);
     }
     
-    public HttpRequest(String method, String path) throws ProtocolException {
-        this(null, (method + " " + path).getBytes());
+    public HttpRequest(String requestLine) throws ProtocolException {
+        super();
+        parse(requestLine.getBytes());
     }
-
 
     
     /**
-     * Create a request given the incoming network channel and raw
+     * Create a request given the a network channel and raw
      * byte data (possibly read from the same channel).
      * A request is bound to this channel and the response from this
-     * request will be sent via the same channel.
+     * request will be sent via the same channel unless specified 
+     * another channel is explicitly set.
      * 
      * @param channel must not be null.
      * @param data raw byte data. Must follow HTTP request syntax.
      */
-    public HttpRequest(SocketChannel channel, byte[] data) throws ProtocolException {
+    public HttpRequest(ByteChannel channel, byte[] data) throws ProtocolException {
         super(channel);
-        parse(channel, data);
-        
+        parse(data);
+        setURI(channel, true);
     }
     
     public void addParameter(String key, String value) {
@@ -93,50 +97,52 @@ public class HttpRequest extends Request {
     
     private static final String WHITESPACE = "\\s+";
     private static final String HTTP_VERSION_PATTERN = "HTTP/(\\d)\\.(\\d)";
-    public /* for testing */
-    void parse(SocketChannel channel, byte[] data) throws ProtocolException {
-        String content = new String(data);
-        _logger.debug("parsing request data " + content);
+    
+    /**
+     * Parses given array of bytes as per HTTP request format.
+     * @param data
+     * @throws ProtocolException
+     */
+    protected void parse(byte[] data ) throws ProtocolException {
+        parse(new String(data));
+    }
+    
+    /**
+     * Parses given string as per HTTP Request format. 
+     * @param content a string as HTTP request
+     * @throws ProtocolException if parsing fails
+     */
+    protected void parse(String content) throws ProtocolException {
+        _logger.debug("parsing request data \r\n" + content);
         
-       
        BufferedReader reader = new BufferedReader(new StringReader(content));
        String requestLine = null;
        try {
            requestLine = reader.readLine();
-           if (requestLine == null) return;
+           _logger.debug("request line [" + requestLine + ']');
+           if (requestLine == null) 
+               throw new ProtocolException("null request line [" + requestLine + "]");
        } catch (IOException ex) {
-           throw new ProtocolException(ex);
+           _logger.warn("i/o error reading request :" + ex);
+           throw new ProtocolException("error reading request line", ex);
        }
        String[] tokens = requestLine.split(WHITESPACE);
-       if (tokens.length > 1) {
-           try {
-               setMethod(tokens[0].trim());
-           } catch (IllegalArgumentException ex) {
-               throw new ProtocolException(ex.getMessage(), ex);
-           }
-           setPath(tokens[1]);
-           
-           if (tokens.length > 2) {
-               Pattern versionPattern = Pattern.compile(HTTP_VERSION_PATTERN);
-               Matcher matcher = versionPattern.matcher(tokens[2].trim());
-               if (matcher.matches()) {
-                   setVersion(matcher.group(1) + "." + matcher.group(2));
-               } else {
-                   throw new ProtocolException("Invalid version " + tokens[2]);
-               }
-           }
-       } else {
-             throw new ProtocolException("Invalid request line " + requestLine);
+       if (tokens.length < 2) {
+           throw new ProtocolException("invalid request line [" + requestLine + "]");
        }
        
-       String line = "";
+       setMethod(tokens[0].trim());
+       setPath(tokens[1].trim());
+       if (tokens.length > 2) setVersion(tokens[2].trim());
+           
+       // read headers. Ignore empty line. Stop at CRLF
+       String line = null;
        try {
            while ((line = reader.readLine()) != null) {
-               if (line.equals(HttpOperation.CRLF)) break;
+               if (line.equals(HttpConstants.CRLF)) break;
                if (line.trim().length() == 0) break;
-               int idx = line.indexOf(":");
-               addHeader(line.substring(0, idx).toLowerCase(), 
-                       line.substring(idx+1).trim());
+               HttpHeader header = new HttpHeader(line);
+               _headers.put(header.getName(), header);
            }
        } catch (IOException ex) {
            throw new ProtocolException(ex);
@@ -144,18 +150,39 @@ public class HttpRequest extends Request {
        
        // read body
        
-       setURI(channel);
+    }
+    
+    
+    /**
+     * Sets HTTP version of this string
+     * @param version HTTP version specifier e.g. HTTP/1.1
+     * @return the same request
+     */
+    void setVersion(String version) throws ProtocolException {
+        Pattern versionPattern = Pattern.compile(HTTP_VERSION_PATTERN);
+        Matcher matcher = versionPattern.matcher(version);
+        if (matcher.matches()) {
+            _version = version; //matcher.group(1) + "." + matcher.group(2);
+        } else {
+            throw new ProtocolException("Invalid version " + version);
+        }
     }
     
     
     /**
      * Adds a header.
      * 
-     * @param name name of the header field e.g. Content-Length
-     * @param value value of the header e.g. 2034 as a string
+     * @param name name of the header field e.g. Content-Length. Must not be
+     * null.
+     * @param value value of the header e.g. 2034 as a string. Can be null.
      */
     public void addHeader(String name, String value) {
-        _headers.add(new HttpHeader(name, value));
+        HttpHeader header = new HttpHeader(name, value);
+        _headers.put(header.getName(), header);
+    }
+    
+    public HttpHeader getHeader(String name) {
+        return _headers.get(name);
     }
     
     /**
@@ -166,24 +193,15 @@ public class HttpRequest extends Request {
      * getMethod()} will return the name in upper case.
      * @return the same request
      */
-    public HttpRequest setMethod(String method) {
+    protected HttpRequest setMethod(String method) throws ProtocolException {
         if (method == null 
-        || !HttpOperation.ALLOWED_METHODS.contains(method.toUpperCase()))
-            throw new IllegalArgumentException("invalid method " + method);
+        || !HttpConstants.ALLOWED_METHODS.contains(method.toUpperCase()))
+            throw new ProtocolException("invalid method " + method);
         _method = method.toUpperCase();
         return this;
     }
     
     
-    /**
-     * Sets HTTP version of this string
-     * @param version HTTP version specifier e.g. HTTP/1.1
-     * @return the same request
-     */
-    public HttpRequest setVersion(String version) {
-        _version = version;
-        return this;
-    }
     
     /**
      * Gets HTTP method name.
@@ -220,9 +238,10 @@ public class HttpRequest extends Request {
      * 
      */
     @Override
-    public void send(SocketChannel channel) throws IOException {
-        String s = getMethod() + " " + getPath() + " " + getVersion();
-        channel.write(ByteBuffer.wrap(s.getBytes()));
+    public void send(ByteChannel channel) throws IOException {
+        setChannel(channel);
+        writeString(getMethod(), " " , getPath(), " ", getVersion());
+        flush();
     }
     
     
@@ -233,16 +252,17 @@ public class HttpRequest extends Request {
      *  
      * @param path
      */
-    public void setPath(String path) {
-        if (path == null) throw new IllegalArgumentException("Path must not be null");
+    protected void setPath(String path) throws ProtocolException {
+        if (path == null) throw new ProtocolException("Path must not be null");
+        _path = path;
         
     }
     public String toString() {
         return _uri == null ? "null" : _uri.toString();
     }
     
-    void setURI(SocketChannel channel) {
-        ChannelInfo addr = new ChannelInfo(channel);
+    protected void setURI(Channel channel, boolean local) {
+        ChannelInfo addr = new ChannelInfo(channel, local);
         try {
             _uri = new URI(HttpConstants.PROTOCOL_NAME, null,
                     addr.getHost(), addr.getPort(), "/" + getPath(), 
@@ -255,4 +275,36 @@ public class HttpRequest extends Request {
     public URI getURI() {
         return _uri;
     }
+
+    @Override
+    protected void receive(ByteChannel channel) throws IOException {
+        setChannel(channel);
+
+        ByteBuffer readBuffer = ByteBuffer.allocate(1024);
+        ByteBuffer buf = ByteBuffer.allocate(1024);
+        boolean end = false;
+        _logger.debug("receiving request from channel " + channel + " ...");
+        while (!end) {
+            buf.clear();
+            int n = channel.read(buf);
+            if (n < 0) throw new IOException("channel has been closed by remote");
+            if (n == 0) continue;
+            if (n >= 4) {
+                byte[] endMarker = new byte[4];
+                buf.position(buf.position()-4);
+                buf.get(endMarker);
+                _logger.debug("last 4-byte " + Arrays.toString(endMarker));
+                end = endMarker[0] == (byte)'\r'
+                        && endMarker[1] == (byte)'\n'
+                        && endMarker[2] == (byte)'\r'
+                        && endMarker[3] == (byte)'\n';
+            }
+            buf.flip();
+            readBuffer.put(buf);
+        }
+        _logger.debug("received " + readBuffer.position() + " bytes request");
+        parse(readBuffer.array());
+        setURI(channel, true);
+    }
+    
 }

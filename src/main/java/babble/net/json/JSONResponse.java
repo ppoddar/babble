@@ -10,16 +10,18 @@ import static babble.net.json.JSONRPC.PROPERTY_RESULT;
 
 import java.io.IOException;
 import java.io.PrintStream;
-import java.nio.channels.SocketChannel;
+import java.nio.channels.ByteChannel;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
 import babble.net.Response;
+import babble.net.ResponseCallback;
 
 @SuppressWarnings("serial")
-public class JSONResponse extends Response<JSONRequest> {
+public class JSONResponse extends Response {
     private final JSONObject _json;
+    
     
     public JSONResponse(JSONRequest request) {
         super(request);
@@ -61,9 +63,9 @@ public class JSONResponse extends Response<JSONRequest> {
     }
     
     @Override
-    protected void send(SocketChannel channel) throws IOException {
-        write(_json.toString());
-        super.send(channel);
+    public void send(ByteChannel channel) throws IOException {
+        setChannel(channel);
+        writeString(_json.toString());
     }
     
     public static void printOutput(PrintStream out, JSONObject json) {
@@ -80,6 +82,11 @@ public class JSONResponse extends Response<JSONRequest> {
             out.println(json.toString());
         }
         
+    }
+
+    @Override
+    public void receive(ByteChannel channel, ResponseCallback cb) {
+        throw new AbstractMethodError();
     }
     
 

@@ -45,9 +45,7 @@ public class JSONRPCServer extends NioServer<JSONRequest,JSONResponse> {
         
         int port = Integer.parseInt(args[0]);
         
-        JSONRPCServer server = new JSONRPCServer(port);
-        JSONRPCRouter router = new JSONRPCRouter(server);
-        server.setRouter(router);
+        JSONRPCServer server = new JSONRPCServer("babble", port);
         
         server.addRoute(new EchoRoute());
 
@@ -59,12 +57,8 @@ public class JSONRPCServer extends NioServer<JSONRequest,JSONResponse> {
      * @param port
      */
     public JSONRPCServer(String serverName, int port) {
-        super(serverName, port);
+        super(serverName, port, new JSONRPCProtocol());
         
-    }
-
-    public JSONRPCServer(int port) {
-        this("babble", port);
     }
 
 }

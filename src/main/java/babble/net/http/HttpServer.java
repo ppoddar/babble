@@ -3,7 +3,6 @@ package babble.net.http;
 import babble.net.NioServer;
 
 public class HttpServer extends NioServer<HttpRequest,HttpResponse> {
-    private static final int DEFAULT_PORT = 8090;
     
     /**
      * Runs a HTTP server that has no registered operation,
@@ -12,23 +11,30 @@ public class HttpServer extends NioServer<HttpRequest,HttpResponse> {
      * @throws Exception
      */
     public static void main(String[] args) throws Exception {
-        int port = args.length > 0 ? Integer.parseInt(args[0]) : DEFAULT_PORT;
+        if (args.length != 1) {
+            System.err.println("***Missing argument");
+            System.err.println(HttpServer.class.getSimpleName() 
+                    + " - runs a HTTP server on this host");
+            System.err.println("Usage: " + HttpServer.class.getName() + " port");
+            System.err.println("where");
+            System.err.println("\tport listen port of HTTP server");
+            System.exit(1);
+        }
+        
+        int port = Integer.parseInt(args[0]);
+
         HttpServer server = new HttpServer("HttpServer", port);
-        server.setRouter(new HttpRouter(server));
+        server.addRoute(new DefaultGet());
+        
         server.start();
     }
     
     public HttpServer(String serverName, int port) {
-        super(serverName, port);
-        setRouter(new HttpRouter(this));
+        super(serverName, port, new HttpProtocol());
     }
     
-    public HttpServer() {
-        this("HttpServer", DEFAULT_PORT);
+    public HttpServer(int port) {
+        this("HttpServer", port);
     }
 
-    @Override
-    public String getURL() {
-        return "http://" + getHostName() + ":" + getPort();
-    }
 }

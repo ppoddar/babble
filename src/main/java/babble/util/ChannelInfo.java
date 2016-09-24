@@ -13,15 +13,21 @@ import java.nio.channels.SocketChannel;
  */
 public class ChannelInfo {
     private String _host = "?";
-    private int _port = 0;
+    private int _port    = 0;
     
+    /**
+     * Gathers remote host port information about the given channel,
+     * if it is connected to a remote peer.
+     * 
+     * @param channel a communication channel
+     */
     public ChannelInfo(Channel channel) {
         this(channel, false);
     }
     
     /**
      * Creates network host/port information of a given channel.
-     * If channel is connected then information about the remote
+     * If given channel is connected then information about the remote
      * location is collected.
      * 
      * @param channel a network channel
@@ -31,11 +37,11 @@ public class ChannelInfo {
         if (channel == null) return;
         if (!SocketChannel.class.isInstance(channel)) return;
         SocketChannel socket = SocketChannel.class.cast(channel);
+        if (!local & !socket.isConnected()) return;
         try {
             InetSocketAddress addr = (InetSocketAddress) 
-                    (local || !socket.isConnected()
-                    ? socket.getLocalAddress() 
-                    : socket.getRemoteAddress());
+                    (local ? socket.getLocalAddress() 
+                           : socket.getRemoteAddress());
             _host = addr.getHostString();
             _port = addr.getPort();
         } catch (IOException ex) {

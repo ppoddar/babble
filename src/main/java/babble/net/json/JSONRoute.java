@@ -84,5 +84,10 @@ public class JSONRoute implements Route<JSONRequest, JSONResponse> {
         }
         return response;
     }
+    
+    
+    public String toString() {
+        return _methodSignature;
+    }
 
 }

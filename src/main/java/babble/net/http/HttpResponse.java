@@ -1,16 +1,19 @@
 package babble.net.http;
 
+import static babble.net.http.HttpConstants.*;
+
 import java.io.IOException;
-import java.nio.channels.SocketChannel;
-import java.nio.file.Files;
+import java.nio.channels.ByteChannel;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import babble.net.Response;
+import babble.net.ResponseCallback;
 
 /**
  * A response according to HTTP specification.
@@ -19,27 +22,26 @@ import babble.net.Response;
  *
  */
 @SuppressWarnings("serial")
-public class HttpResponse extends Response<HttpRequest> {
+public class HttpResponse extends Response {
+    int status = HttpConstants.STATUS_OK;
+    String message = "OK";
+    LinkedList<Object> _sections;
     
-    private final String HTTP_VERSION = "HTTP/1.1";
-    private static final String SP = " ";
-    private static final String CRLF = "\r\n";
-    int status;
-    String message;
-    Object _body;
-    List<HttpHeader> _headers = new ArrayList<HttpHeader>();
+    Map<String,HttpHeader> _headers = new HashMap<String, HttpHeader>();
 
     private static final Logger _logger = LoggerFactory.getLogger(HttpResponse.class);
 
     /**
-     * Creates a response which would be sent on the given channel. 
+     * Creates a response for given request.
      * 
-     * @param request the request which has originated this response.
-     * Often the response is sent via the same channel where request
-     * had been received.
+     * @param request a request. must not be null.
      */
     public HttpResponse(HttpRequest request) {
         super(request);
+    }
+    
+    public HttpRequest getRequest() {
+        return (HttpRequest)super.getRequest();
     }
 
     /**
@@ -49,15 +51,18 @@ public class HttpResponse extends Response<HttpRequest> {
      * @param value
      */
     public void addHeader(String name, String value) {
-        _headers.add(new HttpHeader(name, value));
+        HttpHeader header = new HttpHeader(name, value);
+        _headers.put(header.getName(), header);
     }
 
-    public HttpResponse setBody(Path path) throws IOException {
+    public HttpResponse addBodySection(Path path) throws IOException {
         if (path == null) {
-            _body = null;
+            _logger.warn("null path can not be to body");
             return this;
         }
-        _body = path;
+        if (_sections == null) _sections = new LinkedList<Object>();
+        _sections.add(path);
+        _logger.debug("added path body section " + _sections.size() + " path=" + path);
         return this;
     }
     /**
@@ -67,13 +72,27 @@ public class HttpResponse extends Response<HttpRequest> {
      * 
      * @throws IOException
      */
-    public HttpResponse setBody(String body) throws IOException {
-        if (body == null) {
-            _body = null;
-            return this;
+    public HttpResponse addBodySection(String s) throws IOException {
+        if (s == null) return this;
+        if (_sections == null) {
+            _sections = new LinkedList<Object>();
+        } 
+        
+        StringBuilder builder = new StringBuilder();
+        _sections.add(builder);
+        builder.append(s);
+        return this;
+    }
+    
+    public HttpResponse appendBody(String s) throws IOException {
+        if (s == null) return this;
+        if (_sections == null && !_sections.isEmpty()
+         && StringBuilder.class.isInstance(_sections.getLast())) {
+            StringBuilder.class.cast(_sections.getLast()).append(s);
+        } else {
+            addBodySection(s);
         }
-        _body = body;
-         return this;
+        return this;
     }
 
     /**
@@ -98,79 +117,92 @@ public class HttpResponse extends Response<HttpRequest> {
     }
 
     /**
-     * Sends the response across via communication channel.
-     * The response is written in different section according to HTTP
+     * Sends the response across via network channel.
+     * The response is written with Transfer-encoding according to HTTP
      * specification.
      * 
      */
     @Override
-    public void send(SocketChannel channel) throws IOException {
-        //SocketChannel channel = getRequest().getChannel();
-        _logger.debug("writing response to channel " + channel.getRemoteAddress());
-        write(HTTP_VERSION, SP, ""+status, SP, message, CRLF);
+    public void send(ByteChannel channel) throws IOException {
+        if (_sections == null) return;
+        _logger.debug("writing response to channel " + channel);
+        setChannel(channel);
         
-
-        long contentLength = getContentLength();
-        if (contentLength > 0) {
-            addHeader("Content-Length", "" + getContentLength());
-        }
+        addConnectionHeader();
+        addHeader(HEADER_TRANSFER_ENCODING, "chunked");
+        
+        writeString(PROTOCOL_VRESION, SP, ""+status, SP, message, CRLF);
+        
         // write each header separated by CRLF
-        for (HttpHeader header : _headers) {
-            write(header.toString());
-            _logger.debug("Header:" + header.toString());
-            write(CRLF);
+        for (Map.Entry<String, HttpHeader> e : _headers.entrySet()) {
+            writeString(e.getValue().toString());
+            writeCRLF();
+            _logger.debug("Header:" + e.getValue().toString());
         }
         // separate header and body section by a CRLF
-        write(CRLF);
+        writeCRLF(); 
         
         writeBody();
-        write(CRLF);
         
-        // now send the response over the channel
-        super.send(channel);
+        flush();
         
-        _logger.debug("finished writing response to channel "  + channel.getRemoteAddress());
+        _logger.debug("finished writing response to channel "  + channel);
 
-        // should or should not the channel be closed?
-        // unless the channel is closed, ApacheBench hangs
-        //   getChannel().close();
+        if ("close".equals(getHeaderValue(HEADER_CONNECTION))) {
+            _logger.debug("closing channel");
+            getChannel().close();
+        } else {
+            _logger.debug("not closing channel");
+        }
+    }
+    
+    Object getHeaderValue(String name) {
+        HttpHeader header = _headers.get(name);
+        return header == null ? null : header.getValue();
+    }
+    
+    
+    /**
+     * Adds a connection header.
+     * If request had a header, its value is copied. Otherwise, connection
+     * is 'persistent'
+     */
+    void addConnectionHeader() {
+        HttpHeader requestHeader = getRequest().getHeader(HEADER_CONNECTION);
+        if (requestHeader == null) {
+            addHeader(HEADER_CONNECTION, "persistent");
+        } else {
+            addHeader(HEADER_CONNECTION, requestHeader.getValue());
+        }
+        
         
     }
     
     void writeBody() throws IOException {
-        if (_body == null) {
-            return;
-        }
-        if (String.class.isInstance(_body)) {
-            write(String.class.cast(_body));
-        } else if (Path.class.isInstance(_body)) {
-            stream(Path.class.cast(_body));
-        }
-    }
-
-    /**
-     * Estimates number of bytes in the body section of the response.
-     * @return number of bytes in body section, if it can be determined. 
-     * -1, otherwise.
-     */
-    long getContentLength() {
-        if (_body == null) {
-            return -1;
-        }
-        if (String.class.isInstance(_body)) {
-            return String.class.cast(_body).getBytes().length;
-       } else if (Path.class.isInstance(_body)) {
-            try {
-                return Files.size(Path.class.cast(_body));
-            } catch (IOException ex) {
-                return -1;
+        _logger.debug("writing body " + (_sections == null ? "no"
+                :""+_sections.size()) + " sections");
+        for (int i = 0; _sections != null && i < _sections.size(); i++) {
+            Object section = _sections.get(i);
+            if (section instanceof StringBuilder) {
+                writeStringInChunks(section.toString());
+            } else if (section instanceof Path) {
+                writeStream((Path)section);
+            } else {
+                throw new RuntimeException("unrecognized section " + section);
             }
         }
-        return -1;
+        _logger.debug("ending with last chunk");
+        writeChunk(new byte[0]);
     }
     
-    public String toString() {
-        return "response-" + getRequest().toString();
+    
+
+    
+
+    @Override
+    public void receive(ByteChannel channel, ResponseCallback cb) {
+        // read channel data
+        // call callabck
     }
 
 
