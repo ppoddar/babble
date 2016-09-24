@@ -1,0 +1,14 @@
+<map id="G" name="G">
+<area shape="rect" id="node1_0" href="../Router.html" title="babble.net.Router" alt="" coords="363,17,679,41"/>
+<area shape="rect" id="node1" href="../Router.html" title="&lt;TABLE&gt;" alt="" coords="353,5,690,53"/>
+<area shape="rect" id="node3_1" href="./HttpRouter.html" title="babble.net.http.HttpRouter" alt="" coords="398,113,479,137"/>
+<area shape="rect" id="node3" href="./HttpRouter.html" title="&lt;TABLE&gt;" alt="" coords="387,101,490,149"/>
+<area shape="rect" id="node4_2" href="http://java.sun.com/j2se/1.4.2/docs/api/org/slf4j/Logger.html" title="org.slf4j.Logger" alt="" coords="601,203,685,243"/>
+<area shape="rect" id="node4" href="http://java.sun.com/j2se/1.4.2/docs/api/org/slf4j/Logger.html" title="&lt;TABLE&gt;" alt="" coords="590,197,695,248"/>
+<area shape="rect" id="node2_3" href="../Route.html" title="babble.net.Route" alt="" coords="16,203,328,243"/>
+<area shape="rect" id="node2" href="../Route.html" title="&lt;TABLE&gt;" alt="" coords="5,197,339,248"/>
+<area shape="rect" id="node5_4" href="http://java.sun.com/j2se/1.4.2/docs/api/java/lang/String.html" title="java.lang.String" alt="" coords="374,211,426,235"/>
+<area shape="rect" id="node5" href="http://java.sun.com/j2se/1.4.2/docs/api/java/lang/String.html" title="&lt;TABLE&gt;" alt="" coords="363,199,437,247"/>
+<area shape="rect" id="node6_5" href="http://java.sun.com/j2se/1.4.2/docs/api/java/util/List.html" title="java.util.List" alt="" coords="471,203,555,243"/>
+<area shape="rect" id="node6" href="http://java.sun.com/j2se/1.4.2/docs/api/java/util/List.html" title="&lt;TABLE&gt;" alt="" coords="461,197,566,248"/>
+</map>

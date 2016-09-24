@@ -1,0 +1,12 @@
+<map id="G" name="G">
+<area shape="rect" id="node1_0" href="../Route.html" title="babble.net.Route" alt="" coords="16,11,328,51"/>
+<area shape="rect" id="node1" href="../Route.html" title="&lt;TABLE&gt;" alt="" coords="5,5,339,56"/>
+<area shape="rect" id="node2_1" href="./HttpRoute.html" title="babble.net.http.HttpRoute" alt="" coords="133,116,211,140"/>
+<area shape="rect" id="node2" href="./HttpRoute.html" title="&lt;TABLE&gt;" alt="" coords="123,104,221,152"/>
+<area shape="rect" id="node3_2" href="./DefaultGet.html" title="babble.net.http.DefaultGet" alt="" coords="42,212,123,236"/>
+<area shape="rect" id="node3" href="./DefaultGet.html" title="&lt;TABLE&gt;" alt="" coords="31,200,134,248"/>
+<area shape="rect" id="node4_3" href="http://java.sun.com/j2se/1.4.2/docs/api/java/lang/String.html" title="java.lang.String" alt="" coords="101,308,153,332"/>
+<area shape="rect" id="node4" href="http://java.sun.com/j2se/1.4.2/docs/api/java/lang/String.html" title="&lt;TABLE&gt;" alt="" coords="90,296,163,344"/>
+<area shape="rect" id="node5_4" href="http://java.sun.com/j2se/1.4.2/docs/api/java/util/regex/Pattern.html" title="java.util.regex.Pattern" alt="" coords="221,212,281,236"/>
+<area shape="rect" id="node5" href="http://java.sun.com/j2se/1.4.2/docs/api/java/util/regex/Pattern.html" title="&lt;TABLE&gt;" alt="" coords="210,200,291,248"/>
+</map>

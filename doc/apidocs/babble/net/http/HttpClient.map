@@ -1,0 +1,14 @@
+<map id="G" name="G">
+<area shape="rect" id="node1_0" href="../ResponseCallback.html" title="babble.net.ResponseCallback" alt="" coords="16,11,144,51"/>
+<area shape="rect" id="node1" href="../ResponseCallback.html" title="&lt;TABLE&gt;" alt="" coords="5,5,155,56"/>
+<area shape="rect" id="node3_1" href="./HttpClient.html" title="babble.net.http.HttpClient" alt="" coords="195,116,271,140"/>
+<area shape="rect" id="node3" href="./HttpClient.html" title="&lt;TABLE&gt;" alt="" coords="185,104,282,152"/>
+<area shape="rect" id="node4_2" href="http://java.sun.com/j2se/1.4.2/docs/api/java/lang/Exception.html" title="java.lang.Exception" alt="" coords="62,212,138,236"/>
+<area shape="rect" id="node4" href="http://java.sun.com/j2se/1.4.2/docs/api/java/lang/Exception.html" title="&lt;TABLE&gt;" alt="" coords="51,200,149,248"/>
+<area shape="rect" id="node2_3" href="../NioClient.html" title="babble.net.NioClient" alt="" coords="189,19,520,43"/>
+<area shape="rect" id="node2" href="../NioClient.html" title="&lt;TABLE&gt;" alt="" coords="179,7,531,55"/>
+<area shape="rect" id="node5_4" href="http://java.sun.com/j2se/1.4.2/docs/api/java/lang/String.html" title="java.lang.String" alt="" coords="326,212,378,236"/>
+<area shape="rect" id="node5" href="http://java.sun.com/j2se/1.4.2/docs/api/java/lang/String.html" title="&lt;TABLE&gt;" alt="" coords="315,200,389,248"/>
+<area shape="rect" id="node6_5" href="http://java.sun.com/j2se/1.4.2/docs/api/java/io/InputStream.html" title="java.io.InputStream" alt="" coords="188,212,279,236"/>
+<area shape="rect" id="node6" href="http://java.sun.com/j2se/1.4.2/docs/api/java/io/InputStream.html" title="&lt;TABLE&gt;" alt="" coords="177,200,289,248"/>
+</map>

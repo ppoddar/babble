@@ -1,0 +1,18 @@
+<map id="G" name="G">
+<area shape="rect" id="node1_0" href="../Request.html" title="babble.net.Request" alt="" coords="196,17,263,41"/>
+<area shape="rect" id="node1" href="../Request.html" title="&lt;TABLE&gt;" alt="" coords="185,5,273,53"/>
+<area shape="rect" id="node2_1" href="./JSONRequest.html" title="babble.net.json.JSONRequest" alt="" coords="267,113,370,137"/>
+<area shape="rect" id="node2" href="./JSONRequest.html" title="&lt;TABLE&gt;" alt="" coords="257,101,381,149"/>
+<area shape="rect" id="node3_2" href="http://java.sun.com/j2se/1.4.2/docs/api/java/nio/channels/ByteChannel.html" title="java.nio.channels.ByteChannel" alt="" coords="16,203,109,243"/>
+<area shape="rect" id="node3" href="http://java.sun.com/j2se/1.4.2/docs/api/java/nio/channels/ByteChannel.html" title="&lt;TABLE&gt;" alt="" coords="5,197,120,248"/>
+<area shape="rect" id="node4_3" href="http://java.sun.com/j2se/1.4.2/docs/api/org/json/JSONObject.html" title="org.json.JSONObject" alt="" coords="155,211,247,235"/>
+<area shape="rect" id="node4" href="http://java.sun.com/j2se/1.4.2/docs/api/org/json/JSONObject.html" title="&lt;TABLE&gt;" alt="" coords="145,199,258,247"/>
+<area shape="rect" id="node5_4" href="http://java.sun.com/j2se/1.4.2/docs/api/java/lang/String.html" title="java.lang.String" alt="" coords="293,211,345,235"/>
+<area shape="rect" id="node5" href="http://java.sun.com/j2se/1.4.2/docs/api/java/lang/String.html" title="&lt;TABLE&gt;" alt="" coords="282,199,355,247"/>
+<area shape="rect" id="node6_5" href="http://java.sun.com/j2se/1.4.2/docs/api/java/util/List.html" title="java.util.List" alt="" coords="390,203,474,243"/>
+<area shape="rect" id="node6" href="http://java.sun.com/j2se/1.4.2/docs/api/java/util/List.html" title="&lt;TABLE&gt;" alt="" coords="379,197,485,248"/>
+<area shape="rect" id="node7_6" href="http://java.sun.com/j2se/1.4.2/docs/api/org/slf4j/Logger.html" title="org.slf4j.Logger" alt="" coords="519,203,603,243"/>
+<area shape="rect" id="node7" href="http://java.sun.com/j2se/1.4.2/docs/api/org/slf4j/Logger.html" title="&lt;TABLE&gt;" alt="" coords="509,197,614,248"/>
+<area shape="rect" id="node8_7" href="http://java.sun.com/j2se/1.4.2/docs/api/java/lang/Object.html" title="java.lang.Object" alt="" coords="649,211,705,235"/>
+<area shape="rect" id="node8" href="http://java.sun.com/j2se/1.4.2/docs/api/java/lang/Object.html" title="&lt;TABLE&gt;" alt="" coords="639,199,716,247"/>
+</map>

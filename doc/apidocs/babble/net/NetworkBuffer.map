@@ -1,0 +1,22 @@
+<map id="G" name="G">
+<area shape="rect" id="node1_0" href="./Response.html" title="babble.net.Response" alt="" coords="16,115,93,139"/>
+<area shape="rect" id="node1" href="./Response.html" title="&lt;TABLE&gt;" alt="" coords="5,103,104,151"/>
+<area shape="rect" id="node4_1" href="http://java.sun.com/j2se/1.4.2/docs/api/java/nio/channels/ByteChannel.html" title="java.nio.channels.ByteChannel" alt="" coords="125,205,219,245"/>
+<area shape="rect" id="node4" href="http://java.sun.com/j2se/1.4.2/docs/api/java/nio/channels/ByteChannel.html" title="&lt;TABLE&gt;" alt="" coords="115,200,229,251"/>
+<area shape="rect" id="node2_2" href="./Request.html" title="babble.net.Request" alt="" coords="139,115,205,139"/>
+<area shape="rect" id="node2" href="./Request.html" title="&lt;TABLE&gt;" alt="" coords="128,103,216,151"/>
+<area shape="rect" id="node3_3" href="./NetworkBuffer.html" title="babble.net.NetworkBuffer" alt="" coords="277,17,379,41"/>
+<area shape="rect" id="node3" href="./NetworkBuffer.html" title="&lt;TABLE&gt;" alt="" coords="267,5,389,53"/>
+<area shape="rect" id="node5_4" href="http://java.sun.com/j2se/1.4.2/docs/api/java/lang/String.html" title="java.lang.String" alt="" coords="302,115,354,139"/>
+<area shape="rect" id="node5" href="http://java.sun.com/j2se/1.4.2/docs/api/java/lang/String.html" title="&lt;TABLE&gt;" alt="" coords="291,103,365,151"/>
+<area shape="rect" id="node6_5" href="http://java.sun.com/j2se/1.4.2/docs/api/java/io/InputStream.html" title="java.io.InputStream" alt="" coords="400,115,491,139"/>
+<area shape="rect" id="node6" href="http://java.sun.com/j2se/1.4.2/docs/api/java/io/InputStream.html" title="&lt;TABLE&gt;" alt="" coords="389,103,501,151"/>
+<area shape="rect" id="node7_6" href="http://java.sun.com/j2se/1.4.2/docs/api/java/nio/ByteBuffer.html" title="java.nio.ByteBuffer" alt="" coords="536,115,616,139"/>
+<area shape="rect" id="node7" href="http://java.sun.com/j2se/1.4.2/docs/api/java/nio/ByteBuffer.html" title="&lt;TABLE&gt;" alt="" coords="525,103,627,151"/>
+<area shape="rect" id="node8_7" href="http://java.sun.com/j2se/1.4.2/docs/api/org/slf4j/Logger.html" title="org.slf4j.Logger" alt="" coords="662,107,746,147"/>
+<area shape="rect" id="node8" href="http://java.sun.com/j2se/1.4.2/docs/api/org/slf4j/Logger.html" title="&lt;TABLE&gt;" alt="" coords="651,101,757,152"/>
+<area shape="rect" id="node9_8" href="http://java.sun.com/j2se/1.4.2/docs/api/java/nio/charset/Charset.html" title="java.nio.charset.Charset" alt="" coords="792,115,856,139"/>
+<area shape="rect" id="node9" href="http://java.sun.com/j2se/1.4.2/docs/api/java/nio/charset/Charset.html" title="&lt;TABLE&gt;" alt="" coords="781,103,867,151"/>
+<area shape="rect" id="node10_9" href="http://java.sun.com/j2se/1.4.2/docs/api/java/nio/file/Path.html" title="java.nio.file.Path" alt="" coords="902,107,986,147"/>
+<area shape="rect" id="node10" href="http://java.sun.com/j2se/1.4.2/docs/api/java/nio/file/Path.html" title="&lt;TABLE&gt;" alt="" coords="891,101,997,152"/>
+</map>
