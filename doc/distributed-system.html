@@ -1,0 +1,95 @@
+<html>
+<head>
+<title>Distributed System</title>
+<link rel="stylesheet" type="text/css" href="./css/babble.css">
+</head>
+
+<h1>Distributed System</h1>
+<span class='dropcap'>D</span>istributed system is an interconnected collection of component services.
+The user of distributed system sees the entire collection of services as
+a single service. However, the user-visible service is a composition of
+behavior of individual components. Often, 
+behavior emerges in a distributed system by composition that are new to 
+any of its components.
+
+
+<h1>Architecture of Distributed System</h1>
+
+Architecture of a distributed system is described 
+in terms of
+three C's: 
+<br>
+<svg width='500' height='100' viewBox='0 0 500 100' preserveAspectRatio="none">
+  <rect x='000' width='100' height='100'  rx='20' ry='20' style='fill:rgb(255,0,0)'/>
+  <text x="005" y="45">Component</text>
+  <rect x='200' width='100' height='100'  rx='20' ry='20' style='fill:rgb(0,255,0)'/>
+  <text x="205" y="45">Communication</text>
+  <rect x='400' width='100' height='100'  rx='20' ry='20' style='fill:rgb(0,0,255)'/>
+  <text x="405" y="45">Composition</text>
+</svg>
+<br>
+
+<span class='dropcap'>c</apan>omponent implements a specific set of functions.
+A component is independent of the distributed system. It can operate
+on its own and often executes in a process. 
+ 
+<br>
+This proerty allows a component to be developed independently and 
+be part of multiple
+distributed systems.  We will refer these components as <b>micro-service</b>.
+<br>
+A micro-service has own life-cycle and can fail
+and/or its services become unavaialble.
+However,
+a distributed system should be able to function even without some components. 
+<br>
+A micro-service is described in terms of its functions. 
+A function is referred
+by a name and a set of input arguments. 
+An external agency invokes function of a micro-service by name and
+supplying the input arguments in the form of octates.
+<br>
+The sender does not assume any knowledge of intrnal operation of 
+the target component. So, the input to a function are sent as octates
+and not in any specific language object or encoding (such as serialized 
+Java language objects).
+<br>
+The target component receives and interprets the octates and generates a response 
+(again in octate form). that the external agency must be able to interpret.
+
+The octate form accepted by a component for input and octate form in its
+outut are two major aspect of function definition.
+
+The response is asynchronous. The sender or external agency is not supposed to wait
+for an response. Because as sender and target component communicates
+via a network channel, if external agency waits for a response from the target
+component, the network channel would be blocked from any other usage.
+Also a sender must assume the target component to have an independent 
+life cycle i.e. a sender must be able to account for situations where 
+either the target component never responds or never receives the original request. 
+ 
+
+
+connection: the nature of connection between component services is
+a distinguish characteristic of a distributed system.
+
+Bus
+Recursive
+Spaghetti
+
+connction not only determines the physical channels of
+communication but also communication protocol between the components. Though
+physical connectivity and communication protocol ar related, but they are
+distinct aspects of connction architure 
+
+publish-subscribe
+request-response
+ 
+composition refers to aggregating responses of individual components into a
+single cohesive response. Composition must account for fault, because a
+distributed system should be able to produce a response even when 
+individual component services may faulter or may not respond at all. 
+
+</html>
+
+ 

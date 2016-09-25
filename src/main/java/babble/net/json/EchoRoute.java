@@ -13,9 +13,11 @@ public class EchoRoute extends JSONRoute {
     }
 
     @Override
-    public JSONResponse execute(ExecutionContext ctx, JSONRequest request, JSONResponse response) throws Exception {
+    public JSONResponse execute(ExecutionContext ctx, JSONRequest request) throws Exception {
         JSONObject json = request.getBody();
         JSONArray names = json.names();
+        
+        JSONResponse response = new JSONResponse(request);
         for (int i = 0; i < names.length(); i++) {
             String key = names.get(i).toString();
             response.putProperty(key, json.get(key));

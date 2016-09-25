@@ -54,10 +54,9 @@ public class JSONRoute implements Route<JSONRequest, JSONResponse> {
      * The proxied instance is supplied by execution context.
      */
     @Override
-    public JSONResponse execute(ExecutionContext ctx, JSONRequest request, 
-            JSONResponse response) throws Exception {
+    public JSONResponse execute(ExecutionContext ctx, JSONRequest request) throws Exception {
         ProxyContext proxyContext = ProxyContext.class.cast(ctx);
-        
+        JSONResponse response = new JSONResponse(request);
         if (!proxyContext.isInitialized()) {
             response.fail(ERROR_CODE_INVALID_REQUEST, 
                     new IllegalStateException("Proxy is not yet connected"

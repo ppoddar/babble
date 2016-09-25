@@ -361,12 +361,12 @@ public class NetworkBuffer {
      * Asserts that a network channel is available and is writable.
      * @throws IOException
      */
-   void assertWritable() throws IOException {
+   void assertWritable() throws IllegalStateException {
        if (_channel == null) 
-           throw new IOException("can not be writen " 
+           throw new IllegalStateException("can not be writen " 
                + "as it is not bound to any i/o channel");
        if (!_channel.isOpen()) 
-           throw new IOException("can not be written " 
+           throw new IllegalStateException("can not be written " 
                    + " as i/o channel " + _channel + " is not open");
        
    }

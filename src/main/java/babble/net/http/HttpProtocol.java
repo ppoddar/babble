@@ -26,18 +26,18 @@ public class HttpProtocol implements Protocol<HttpRequest, HttpResponse>{
 
     @Override
     public HttpResponse newResponse(HttpRequest request) {
-        return new HttpResponse(request);
+        return new SinglePartHttpResponse(request);
     }
     
     @Override
     public HttpResponse newErrorResponse(HttpRequest request, Exception ex) {
-        HttpResponse response = new HttpResponse(request);
+        HttpResponse response = new SinglePartHttpResponse(request);
         response.addHeader("Content-Type", "text/plain");
         StringWriter stackTrace = new StringWriter();
         
         ex.printStackTrace(new PrintWriter(stackTrace));
         try {
-            response.addBodySection(ex.getClass().getName()+
+            response.appendBody(ex.getClass().getName()+
                     ":"+ ex.getMessage()+ "\r\n");
             response.appendBody("Server side stack trace:\r\n");
             response.appendBody(stackTrace.toString());

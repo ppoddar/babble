@@ -20,15 +20,16 @@ public class DefaultGet extends HttpRoute {
     }
 
     @Override
-    public HttpResponse execute(ExecutionContext ctx, HttpRequest request, 
-            HttpResponse response) throws Exception {
+    public HttpResponse execute(ExecutionContext ctx, HttpRequest request) throws Exception {
+        
+        HttpResponse response = new SinglePartHttpResponse(request);
         
         Path path = Paths.get(request.getPath());
         response.addHeader(HttpConstants.HEADER_CONTENT_TYPE, 
                 guessMimeType(path));
-        
+
         if (path.toFile().exists() && !path.toFile().isDirectory()) {
-            response.addBodySection(path);
+            response.setBody(path);
         } else if (path.toFile().isDirectory()) {
             response.setStatus(403, request.getPath() + " is a directory");
             throw new IllegalArgumentException(request.getPath() + " is a directory");

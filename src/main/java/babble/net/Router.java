@@ -133,7 +133,7 @@ public abstract class Router<R extends Request, P extends Response>
                     @Override
                     public P call() throws Exception {
                         return route.execute(_server.getExecutionContext(), 
-                                request, _server.getProtocol().newResponse(request));
+                                request);
                     }
                 };
                 // associates request to promise of a response

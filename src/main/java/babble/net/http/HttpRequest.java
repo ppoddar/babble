@@ -38,8 +38,13 @@ import babble.util.ChannelInfo;
 public class HttpRequest extends Request {
     String _method;
     String _path;
-    String _version = "";
+    private int _versionMajor, _versionMinor;
     URI _uri;
+    
+    private static String REQUESTLINE_REGEX = 
+     "(?<method>\\S+)\\ (?<path>\\S+)\\ HTTP/(?<major>\\d+)\\.(?<minor>\\d+)";
+    private Pattern _requestLinePattern = Pattern.compile(REQUESTLINE_REGEX);
+    
     Map<String,String> _params = new HashMap<String,String>();
     Map<String, HttpHeader> _headers = new HashMap<String, HttpHeader>();
     
@@ -54,9 +59,8 @@ public class HttpRequest extends Request {
      * Supply a HTTP method and a path.
      */
     public HttpRequest(String method, String path) throws ProtocolException {
-        super();
-        setMethod(method);
-        setPath(path);
+        this(method + HttpConstants.SP + path + HttpConstants.SP 
+                + HttpConstants.PROTOCOL_VRESION_STRING);
     }
     
     public HttpRequest(String requestLine) throws ProtocolException {
@@ -95,8 +99,6 @@ public class HttpRequest extends Request {
      * 
      */
     
-    private static final String WHITESPACE = "\\s+";
-    private static final String HTTP_VERSION_PATTERN = "HTTP/(\\d)\\.(\\d)";
     
     /**
      * Parses given array of bytes as per HTTP request format.
@@ -120,20 +122,12 @@ public class HttpRequest extends Request {
        try {
            requestLine = reader.readLine();
            _logger.debug("request line [" + requestLine + ']');
-           if (requestLine == null) 
-               throw new ProtocolException("null request line [" + requestLine + "]");
        } catch (IOException ex) {
            _logger.warn("i/o error reading request :" + ex);
            throw new ProtocolException("error reading request line", ex);
        }
-       String[] tokens = requestLine.split(WHITESPACE);
-       if (tokens.length < 2) {
-           throw new ProtocolException("invalid request line [" + requestLine + "]");
-       }
        
-       setMethod(tokens[0].trim());
-       setPath(tokens[1].trim());
-       if (tokens.length > 2) setVersion(tokens[2].trim());
+       parseRequestLine(requestLine);
            
        // read headers. Ignore empty line. Stop at CRLF
        String line = null;
@@ -152,22 +146,29 @@ public class HttpRequest extends Request {
        
     }
     
-    
-    /**
-     * Sets HTTP version of this string
-     * @param version HTTP version specifier e.g. HTTP/1.1
-     * @return the same request
-     */
-    void setVersion(String version) throws ProtocolException {
-        Pattern versionPattern = Pattern.compile(HTTP_VERSION_PATTERN);
-        Matcher matcher = versionPattern.matcher(version);
+    void parseRequestLine(String line) throws ProtocolException {
+        if (line == null) 
+            throw new ProtocolException("null request line [" + line + "]");
+        Matcher matcher = _requestLinePattern.matcher(line);
         if (matcher.matches()) {
-            _version = version; //matcher.group(1) + "." + matcher.group(2);
+            setMethod(matcher.group("method"));
+            setPath(matcher.group("path"));
+            setVersionMajor(Integer.parseInt(matcher.group("major")));
+            setVersionMinor(Integer.parseInt(matcher.group("minor")));
         } else {
-            throw new ProtocolException("Invalid version " + version);
+            throw new ProtocolException(line + " does not match request "
+                    + "pattern " + REQUESTLINE_REGEX);
         }
     }
     
+    
+    void setVersionMajor(int v) {
+        _versionMajor = v;
+    }
+    
+    void setVersionMinor(int v) {
+        _versionMinor = v;
+    }
     
     /**
      * Adds a header.
@@ -226,8 +227,9 @@ public class HttpRequest extends Request {
      * 
      * @return HTTP version string e.g. HTTP/1.1
      */
-    public String getVersion() {
-        return _version;
+    public String getVersionString() {
+        return HttpConstants.PROTOCOL_NAME.toUpperCase() + '/'
+                + _versionMajor + '.' + _versionMinor;
     }
     
 
@@ -240,7 +242,7 @@ public class HttpRequest extends Request {
     @Override
     public void send(ByteChannel channel) throws IOException {
         setChannel(channel);
-        writeString(getMethod(), " " , getPath(), " ", getVersion());
+        writeString(getMethod(), " " , getPath(), " ", getVersionString());
         flush();
     }
     

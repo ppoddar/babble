@@ -11,8 +11,13 @@ import java.util.List;
  */
 public class HttpConstants {
 
-    static final String PROTOCOL_NAME    = "http";
-    static final String PROTOCOL_VRESION = "HTTP/1.1";
+    static final String PROTOCOL_NAME       = "http";
+    static final int PROTOCOL_VERSION_MAJOR = 1;
+    static final int PROTOCOL_VERSION_MINOR = 1;
+    static final String PROTOCOL_VRESION_STRING = 
+            PROTOCOL_NAME.toUpperCase() + '/'
+            + PROTOCOL_VERSION_MAJOR + '.'
+            + PROTOCOL_VERSION_MINOR;
 
     public static final String CRLF = "\r\n";
     public static final String SP = " ";
